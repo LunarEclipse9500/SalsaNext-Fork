@@ -7,3 +7,6 @@ Pillow
 matplotlib
 opencv-python
 tensorboard
+pykitti
+vispy
+pyqt6

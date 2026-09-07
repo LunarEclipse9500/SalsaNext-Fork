@@ -7,7 +7,12 @@ import yaml
 import sys
 import numpy as np
 import torch
-import __init__ as booger
+from pathlib import Path
+
+
+TRAIN_ROOT = str(Path(__file__).resolve().parents[2])
+if TRAIN_ROOT not in sys.path:
+    sys.path.insert(0, TRAIN_ROOT)
 
 from tasks.semantic.modules.ioueval import iouEval
 from common.laserscan import SemLaserScan
@@ -234,7 +239,7 @@ if __name__ == '__main__':
         for splits in ('train','valid'):
             eval((DATA["split"][splits]),splits,FLAGS.predictions)
     else:
-        eval(DATA["split"][FLAGS.split],splits,FLAGS.predictions)
+        eval(DATA["split"][FLAGS.split], FLAGS.split, FLAGS.predictions)
 
 
 

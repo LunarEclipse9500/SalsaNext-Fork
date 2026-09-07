@@ -8,7 +8,13 @@ import yaml
 from shutil import copyfile
 import os
 import shutil
-import __init__ as booger
+from pathlib import Path
+import sys
+
+
+TRAIN_ROOT = str(Path(__file__).resolve().parents[2])
+if TRAIN_ROOT not in sys.path:
+    sys.path.insert(0, TRAIN_ROOT)
 
 from tasks.semantic.modules.user import *
 def str2bool(v):
@@ -34,7 +40,7 @@ if __name__ == '__main__':
         '--log', '-l',
         type=str,
         default=os.path.expanduser("~") + '/logs/' +
-                datetime.datetime.now().strftime("%Y-%-m-%d-%H:%M") + '/',
+                datetime.datetime.now().strftime("%Y-%m-%d-%H:%M") + '/',
         help='Directory to put the predictions. Default: ~/logs/date+time'
     )
     parser.add_argument(

@@ -1,3 +1,5 @@
 .idea
 *.pyc
 pretrained/
+dataset_test/
+predictions/

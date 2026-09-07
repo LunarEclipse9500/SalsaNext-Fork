@@ -8,13 +8,13 @@ import torch.backends.cudnn as cudnn
 import yaml
 import time
 from PIL import Image
-import __init__ as booger
 import collections
 import copy
 import cv2
 import os
 import numpy as np
 import importlib.util
+from pathlib import Path
 from tasks.semantic.modules.SalsaNext import *
 from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.postproc.KNN import KNN
@@ -57,9 +57,10 @@ class User():
     self.mc = mc
 
     # get the data
-    spec = importlib.util.spec_from_file_location("parserModule",
-    booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
-    self.DATA["name"] + '/parser.py')
+    train_root = Path(__file__).resolve().parents[3]
+    parser_path = (train_root / "tasks" / "semantic" / "dataset" /
+                   self.DATA["name"] / "parser.py")
+    spec = importlib.util.spec_from_file_location("parserModule", parser_path)
 
     parserModule = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(parserModule)
@@ -250,14 +251,6 @@ class User():
         else:
             proj_output = self.model(proj_in)
             proj_argmax = proj_output[0].argmax(dim=0)
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-            res = time.time() - end
-            print("Network seq", path_seq, "scan", path_name,
-                  "in", res, "sec")
-            end = time.time()
-            cnn.append(res)
-
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             res = time.time() - end

@@ -54,6 +54,36 @@ To train/eval you can use the following scripts:
 ### Pretrained Model
 
 [SalsaNext](https://drive.google.com/file/d/1utfzooTDAlV5M6XGvCE0-L-vbdLe_2rD/view?usp=sharing)
+
+### Portable inference and evaluation commands
+
+After activating the virtual environment and installing `requirements.txt`,
+run these commands from the repository root. The paths can point to any
+dataset, model, and output directories; no directory change is required.
+
+Run inference on a split:
+
+```bash
+python train/tasks/semantic/infer.py \
+  --dataset /path/to/SemanticKITTI \
+  --log /path/to/predictions \
+  --model /path/to/pretrained/pretrained \
+  --split valid
+```
+
+Evaluate the generated predictions:
+
+```bash
+python train/tasks/semantic/evaluate_iou.py \
+  --dataset /path/to/SemanticKITTI \
+  --predictions /path/to/predictions \
+  --split valid \
+  --data_cfg /path/to/pretrained/pretrained/data_cfg.yaml
+```
+
+On Windows PowerShell, use the same commands with backslash paths. For the
+included two-scan test data, the equivalent paths are
+`dataset_test`, `predictions/valid`, and `pretrained/pretrained`.
      
 ### Disclamer
 
