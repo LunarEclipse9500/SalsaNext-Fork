@@ -1,0 +1,22 @@
+valid set:
+Acc avg 0.954
+IoU avg 0.519
+IoU class 1 [car] = 0.891
+IoU class 2 [bicycle] = 0.000
+IoU class 3 [motorcycle] = 0.000
+IoU class 4 [truck] = 0.000
+IoU class 5 [other-vehicle] = 0.000
+IoU class 6 [person] = 0.000
+IoU class 7 [bicyclist] = 0.000
+IoU class 8 [motorcyclist] = 0.982
+IoU class 9 [road] = 0.963
+IoU class 10 [parking] = 0.767
+IoU class 11 [sidewalk] = 0.923
+IoU class 12 [other-ground] = 0.000
+IoU class 13 [building] = 0.925
+IoU class 14 [fence] = 0.456
+IoU class 15 [vegetation] = 0.894
+IoU class 16 [trunk] = 0.781
+IoU class 17 [terrain] = 0.818
+IoU class 18 [pole] = 0.685
+IoU class 19 [traffic-sign] = 0.772
