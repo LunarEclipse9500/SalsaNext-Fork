@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
-import imp
 import yaml
 import time
 from PIL import Image
@@ -15,7 +14,7 @@ import copy
 import cv2
 import os
 import numpy as np
-
+import importlib.util
 from tasks.semantic.modules.SalsaNext import *
 from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.postproc.KNN import KNN
@@ -34,9 +33,13 @@ class User():
     self.mc = mc
 
     # get the data
-    parserModule = imp.load_source("parserModule",
-                                   booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
-                                   self.DATA["name"] + '/parser.py')
+    spec = importlib.util.spec_from_file_location("parserModule",
+    booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
+    self.DATA["name"] + '/parser.py')
+
+    parserModule = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(parserModule)
+    
     self.parser = parserModule.Parser(root=self.datadir,
                                       train_sequences=self.DATA["split"]["train"],
                                       valid_sequences=self.DATA["split"]["valid"],

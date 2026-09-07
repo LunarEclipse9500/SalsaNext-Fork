@@ -3,12 +3,12 @@
 import datetime
 import os
 import time
-import imp
+
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-
+import importlib.util
 import torch.optim as optim
 from matplotlib import pyplot as plt
 from torch.autograd import Variable
@@ -88,9 +88,12 @@ class Trainer():
                      "best_val_iou": 0}
 
         # get the data
-        parserModule = imp.load_source("parserModule",
-                                       booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
-                                       self.DATA["name"] + '/parser.py')
+        spec = importlib.util.spec_from_file_location("parserModule",
+        booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
+        self.DATA["name"] + '/parser.py')
+
+        parserModule = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(parserModule)
         self.parser = parserModule.Parser(root=self.datadir,
                                           train_sequences=self.DATA["split"]["train"],
                                           valid_sequences=self.DATA["split"]["valid"],
