@@ -20,6 +20,30 @@ from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.postproc.KNN import KNN
 
 
+def load_checkpoint(path):
+  """Load checkpoints saved by both old and current PyTorch versions."""
+  try:
+    return torch.load(path, map_location="cpu", weights_only=False)
+  except TypeError:
+    # ``weights_only`` was added after the PyTorch version used by the
+    # original project.
+    return torch.load(path, map_location="cpu")
+
+
+def load_model_weights(model, checkpoint):
+  state_dict = checkpoint["state_dict"]
+  try:
+    model.load_state_dict(state_dict, strict=True)
+  except RuntimeError:
+    # Checkpoints trained with DataParallel store keys as ``module.*``.
+    if not state_dict or not all(key.startswith("module.") for key in state_dict):
+      raise
+    unwrapped_state_dict = {
+        key[len("module."):]: value for key, value in state_dict.items()
+    }
+    model.load_state_dict(unwrapped_state_dict, strict=True)
+
+
 class User():
   def __init__(self, ARCH, DATA, datadir, logdir, modeldir,split,uncertainty,mc=30):
     # parameters
@@ -52,24 +76,29 @@ class User():
                                       max_points=self.ARCH["dataset"]["max_points"],
                                       batch_size=1,
                                       workers=self.ARCH["train"]["workers"],
-                                      gt=True,
+                                      # Inference only needs scans. Keeping this
+                                      # false also supports unlabeled test scans.
+                                      gt=False,
                                       shuffle_train=False)
 
-    # concatenate the encoder and the head
+    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    self.gpu = self.device.type == "cuda"
+    print("Infering in device: ", self.device)
+
+    # Load weights into the unwrapped model first. This supports checkpoints
+    # saved with either one GPU or DataParallel.
     with torch.no_grad():
         torch.nn.Module.dump_patches = True
         if self.uncertainty:
-            self.model = SalsaNextUncertainty(self.parser.get_n_classes())
-            self.model = nn.DataParallel(self.model)
-            w_dict = torch.load(modeldir + "/SalsaNext",
-                                map_location=lambda storage, loc: storage)
-            self.model.load_state_dict(w_dict['state_dict'], strict=True)
+            model = SalsaNextUncertainty(self.parser.get_n_classes())
         else:
-            self.model = SalsaNext(self.parser.get_n_classes())
-            self.model = nn.DataParallel(self.model)
-            w_dict = torch.load(modeldir + "/SalsaNext",
-                                map_location=lambda storage, loc: storage)
-            self.model.load_state_dict(w_dict['state_dict'], strict=True)
+            model = SalsaNext(self.parser.get_n_classes())
+        load_model_weights(model, load_checkpoint(os.path.join(modeldir, "SalsaNext")))
+
+        if self.gpu and torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        self.model = model.to(self.device)
+        self.model_single = self.model.module if isinstance(self.model, nn.DataParallel) else self.model
 
     # use knn post processing?
     self.post = None
@@ -77,16 +106,9 @@ class User():
       self.post = KNN(self.ARCH["post"]["KNN"]["params"],
                       self.parser.get_n_classes())
 
-    # GPU?
-    self.gpu = False
-    self.model_single = self.model
-    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Infering in device: ", self.device)
-    if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+    if self.gpu:
       cudnn.benchmark = True
       cudnn.fastest = True
-      self.gpu = True
-      self.model.cuda()
 
   def infer(self):
     cnn = []

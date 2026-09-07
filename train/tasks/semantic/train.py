@@ -9,7 +9,6 @@ from shutil import copyfile
 import __init__ as booger
 import yaml
 from tasks.semantic.modules.trainer import *
-from pip._vendor.distlib.compat import raw_input
 
 from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.modules.SalsaNext import *
@@ -138,7 +137,7 @@ if __name__ == '__main__':
             FLAGS.pretrained = None
             if os.path.isdir(FLAGS.log):
                 if os.listdir(FLAGS.log):
-                    answer = raw_input("Log Directory is not empty. Do you want to proceed? [y/n]  ")
+                    answer = input("Log Directory is not empty. Do you want to proceed? [y/n]  ")
                     if answer == 'n':
                         quit()
                     else:
