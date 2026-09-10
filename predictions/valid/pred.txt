@@ -1,0 +1,29 @@
+valid set:
+Acc avg 0.000
+IoU avg 0.000
+IoU class 1 [car] = 0.000
+IoU class 2 [bicycle] = 0.000
+IoU class 3 [motorcycle] = 0.000
+IoU class 4 [truck] = 0.000
+IoU class 5 [other-vehicle] = 0.000
+IoU class 6 [person] = 0.000
+IoU class 7 [bicyclist] = 0.000
+IoU class 8 [motorcyclist] = 0.000
+IoU class 9 [road] = 0.000
+IoU class 10 [parking] = 0.000
+IoU class 11 [sidewalk] = 0.000
+IoU class 12 [other-ground] = 0.000
+IoU class 13 [building] = 0.000
+IoU class 14 [fence] = 0.000
+IoU class 15 [vegetation] = 0.000
+IoU class 16 [trunk] = 0.000
+IoU class 17 [terrain] = 0.000
+IoU class 18 [pole] = 0.000
+IoU class 19 [traffic-sign] = 0.000
+valid set:
+Overall accuracy: 0.9424
+Mean IoU: 0.8728
+non-drivable: accuracy=0.9190, IoU=0.8920, support=122053
+drivable: accuracy=0.9769, IoU=0.9577, support=76481
+static obstacle: accuracy=0.9424, IoU=0.7931, support=41957
+dynamic object: accuracy=0.9663, IoU=0.8483, support=8782

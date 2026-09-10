@@ -19,6 +19,42 @@ from common.laserscan import SemLaserScan
 
 # possible splits
 splits = ['train','valid','test']
+
+FOUR_CLASS_NAMES = [
+    "non-drivable",
+    "drivable",
+    "static obstacle",
+    "dynamic object",
+]
+
+
+def map_to_four_classes(labels):
+    """Map original SemanticKITTI IDs to the project's four classes."""
+    labels = np.asarray(labels)
+    mapped = np.zeros(labels.shape, dtype=np.int64)
+
+    # 1 = drivable
+    mapped[(labels == 40) | (labels == 44) | (labels == 60)] = 1
+
+    # 2 = static obstacle
+    mapped[
+        (labels == 50) | (labels == 51) | (labels == 71) |
+        (labels == 80) | (labels == 81)
+    ] = 2
+
+    # 3 = dynamic object, including moving-object SemanticKITTI IDs
+    mapped[
+        (labels == 10) | (labels == 11) | (labels == 15) |
+        (labels == 18) | (labels == 20) | (labels == 30) |
+        (labels == 31) | (labels == 32) | (labels == 252) |
+        (labels == 253) | (labels == 254) | (labels == 255) |
+        (labels == 256) | (labels == 257) | (labels == 258) |
+        (labels == 259) | (labels == 13)
+    ] = 3
+
+    return mapped
+
+
 def save_to_log(logdir,logfile,message):
     f = open(logdir+'/'+logfile, "a")
     f.write(message+'\n')
@@ -79,7 +115,7 @@ def eval(test_sequences,splits,pred):
         label = SemLaserScan(project=False)
         label.open_scan(scan_file)
         label.open_label(label_file)
-        u_label_sem = remap_lut[label.sem_label]  # remap to xentropy format
+        u_label_sem = map_to_four_classes(label.sem_label)
         if FLAGS.limit is not None:
             u_label_sem = u_label_sem[:FLAGS.limit]
 
@@ -87,46 +123,65 @@ def eval(test_sequences,splits,pred):
         pred = SemLaserScan(project=False)
         pred.open_scan(scan_file)
         pred.open_label(pred_file)
-        u_pred_sem = remap_lut[pred.sem_label]  # remap to xentropy format
+        u_pred_sem = pred.sem_label.astype(np.int64)
+        if not np.all(np.isin(u_pred_sem, [0, 1, 2, 3])):
+            raise ValueError(
+                f"Prediction {pred_file} contains labels outside 0..3"
+            )
         if FLAGS.limit is not None:
             u_pred_sem = u_pred_sem[:FLAGS.limit]
 
         # add single scan to evaluation
         evaluator.addBatch(u_pred_sem, u_label_sem)
 
-    # when I am done, print the evaluation
-    m_accuracy = evaluator.getacc()
-    m_jaccard, class_jaccard = evaluator.getIoU()
+    # Compute four-class accuracy and IoU from the confusion matrix.
+    confusion = evaluator.conf_matrix.cpu().numpy()
+    true_positive = np.diag(confusion)
+    ground_truth_count = confusion.sum(axis=0)
+    prediction_count = confusion.sum(axis=1)
 
-    print('{split} set:\n'
-          'Acc avg {m_accuracy:.3f}\n'
-          'IoU avg {m_jaccard:.3f}'.format(split=splits,
-                                           m_accuracy=m_accuracy,
-                                           m_jaccard=m_jaccard))
+    overall_accuracy = true_positive.sum() / max(confusion.sum(), 1)
+    per_class_accuracy = np.divide(
+        true_positive,
+        ground_truth_count,
+        out=np.zeros(4, dtype=float),
+        where=ground_truth_count != 0,
+    )
+    union = ground_truth_count + prediction_count - true_positive
+    per_class_iou = np.divide(
+        true_positive,
+        union,
+        out=np.zeros(4, dtype=float),
+        where=union != 0,
+    )
+    mean_iou = per_class_iou.mean()
 
-    save_to_log(FLAGS.predictions,'pred.txt','{split} set:\n'
-          'Acc avg {m_accuracy:.3f}\n'
-          'IoU avg {m_jaccard:.3f}'.format(split=splits,
-                                           m_accuracy=m_accuracy,
-                                           m_jaccard=m_jaccard))
-    # print also classwise
-    for i, jacc in enumerate(class_jaccard):
-        if i not in ignore:
-            print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                i=i, class_str=class_strings[class_inv_remap[i]], jacc=jacc))
-            save_to_log(FLAGS.predictions, 'pred.txt', 'IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                i=i, class_str=class_strings[class_inv_remap[i]], jacc=jacc))
+    summary = (
+        f'{splits} set:\n'
+        f'Overall accuracy: {overall_accuracy:.4f}\n'
+        f'Mean IoU: {mean_iou:.4f}'
+    )
+    print(summary)
+    save_to_log(FLAGS.predictions, 'pred.txt', summary)
+
+    for class_id, class_name in enumerate(FOUR_CLASS_NAMES):
+        class_summary = (
+            f'{class_name}: accuracy={per_class_accuracy[class_id]:.4f}, '
+            f'IoU={per_class_iou[class_id]:.4f}, '
+            f'support={ground_truth_count[class_id]}'
+        )
+        print(class_summary)
+        save_to_log(FLAGS.predictions, 'pred.txt', class_summary)
 
     # print for spreadsheet
     print("*" * 80)
     print("below can be copied straight for paper table")
-    for i, jacc in enumerate(class_jaccard):
-        if i not in ignore:
-            sys.stdout.write('{jacc:.3f}'.format(jacc=jacc.item()))
-            sys.stdout.write(",")
-    sys.stdout.write('{jacc:.3f}'.format(jacc=m_jaccard.item()))
+    for i, class_iou in enumerate(per_class_iou):
+        sys.stdout.write(f'{class_iou:.3f}')
+        sys.stdout.write(",")
+    sys.stdout.write(f'{mean_iou:.3f}')
     sys.stdout.write(",")
-    sys.stdout.write('{acc:.3f}'.format(acc=m_accuracy.item()))
+    sys.stdout.write(f'{overall_accuracy:.3f}')
     sys.stdout.write('\n')
     sys.stdout.flush()
 
@@ -200,36 +255,11 @@ if __name__ == '__main__':
         print("Error opening data yaml file.")
         quit()
 
-    # get number of interest classes, and the label mappings
-    class_strings = DATA["labels"]
-    class_remap = DATA["learning_map"]
-    class_inv_remap = DATA["learning_map_inv"]
-    class_ignore = DATA["learning_ignore"]
-    nr_classes = len(class_inv_remap)
-
-    # make lookup table for mapping
-    maxkey = 0
-    for key, data in class_remap.items():
-        if key > maxkey:
-            maxkey = key
-    # +100 hack making lut bigger just in case there are unknown labels
-    remap_lut = np.zeros((maxkey + 100), dtype=np.int32)
-    for key, data in class_remap.items():
-        try:
-            remap_lut[key] = data
-        except IndexError:
-            print("Wrong key ", key)
-    # print(remap_lut)
-
-    # create evaluator
+    # Evaluate in the four-class space. Non-drivable is a valid class, so
+    # no class is ignored.
+    nr_classes = 4
     ignore = []
-    for cl, ign in class_ignore.items():
-        if ign:
-            x_cl = int(cl)
-            ignore.append(x_cl)
-            print("Ignoring xentropy class ", x_cl, " in IoU evaluation")
 
-    # create evaluator
     device = torch.device("cpu")
     evaluator = iouEval(nr_classes, device, ignore)
     evaluator.reset()
@@ -240,7 +270,4 @@ if __name__ == '__main__':
             eval((DATA["split"][splits]),splits,FLAGS.predictions)
     else:
         eval(DATA["split"][FLAGS.split], FLAGS.split, FLAGS.predictions)
-
-
-
 

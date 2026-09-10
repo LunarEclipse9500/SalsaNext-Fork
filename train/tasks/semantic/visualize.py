@@ -5,6 +5,7 @@ import argparse
 import os
 import yaml
 import __init__ as booger
+from pathlib import Path
 
 from common.laserscan import LaserScan, SemLaserScan
 from common.laserscanvis import LaserScanVis
@@ -21,8 +22,10 @@ if __name__ == '__main__':
         '--config', '-c',
         type=str,
         required=False,
-        default="config/labels/semantic-kitti.yaml",
-        help='Dataset config file. Defaults to %(default)s',
+        default=str(Path(__file__).resolve().parent / "config" / "labels" /
+                    "four_class_colors.yaml"),
+        help='Color config for the labels being visualized. Defaults to the '
+             'four-class prediction colors.',
     )
     parser.add_argument(
         '--sequence', '-s',
