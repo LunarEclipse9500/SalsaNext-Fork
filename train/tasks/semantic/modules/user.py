@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import yaml
@@ -222,6 +223,8 @@ class User():
             # map to original label
             pred_np = to_orig_fn(pred_np)
 
+           
+
             # save scan
             path = os.path.join(self.logdir, "sequences",
                                 path_seq, "predictions", path_name)
@@ -249,10 +252,18 @@ class User():
 
             print(total_time / total_frames)
         else:
+            # Run SalsaNext
             proj_output = self.model(proj_in)
-            proj_argmax = proj_output[0].argmax(dim=0)
+            proj_argmax = proj_output.argmax(dim=1)[0]
+            # Convert 19 SalsaNext classes to 4 project classes
+            # proj_argmax = self.map_to_4_classes(proj_argmax)
+
+
+            # Median-filter the 4-class prediction image
+            proj_argmax = self.median_filter_label_image(proj_argmax)
+
             if torch.cuda.is_available():
-                torch.cuda.synchronize()
+              torch.cuda.synchronize()
             res = time.time() - end
             print("Network seq", path_seq, "scan", path_name,
                   "in", res, "sec")
@@ -283,11 +294,74 @@ class User():
             # get the first scan in batch and project scan
             pred_np = unproj_argmax.cpu().numpy()
             pred_np = pred_np.reshape((-1)).astype(np.int32)
-
-            # map to original label
             pred_np = to_orig_fn(pred_np)
+            pred_np = self.map_to_4_classes(pred_np)
+
+
 
             # save scan
             path = os.path.join(self.logdir, "sequences",
                                 path_seq, "predictions", path_name)
             pred_np.tofile(path)
+
+
+  def median_filter_label_image(self, label_image, kernel_size=3):
+    """
+    Apply a 2D median filter to the predicted label image.
+
+    label_image: [H, W]
+    Returns:     [H, W]
+    """
+
+    pad = kernel_size // 2
+
+    # Add batch and channel dimensions
+    x = label_image.float().unsqueeze(0).unsqueeze(0)
+
+    # Pad the image
+    x = F.pad(x, (pad, pad, pad, pad), mode="reflect")
+
+    # Create sliding windows
+    windows = F.unfold(
+        x,
+        kernel_size=kernel_size
+    )
+
+    # Median of every window
+    filtered = windows.median(dim=1).values
+
+    # Restore H × W
+    filtered = filtered.reshape(
+        label_image.shape[0],
+        label_image.shape[1]
+    )
+
+    return filtered.long()
+  
+   # ADDING CODE FOR 4 CLASSES 
+  def map_to_4_classes(self, pred):
+    mapped = np.zeros_like(pred)
+
+    # 1 = Drivable
+    mapped[(pred == 40) | (pred == 44)] = 1
+
+    # 2 = Static obstacle
+    mapped[(pred == 50) | (pred == 51) | (pred == 71) |
+           (pred == 80) | (pred == 81)] = 2
+
+    # 3 = Dynamic object
+    mapped[(pred == 10) | (pred == 11) | (pred == 15) |
+           (pred == 18) | (pred == 20) | (pred == 30) |
+           (pred == 31) | (pred == 32)] = 3
+
+    # 0 = Non-drivable
+    # Everything not assigned above remains 0
+
+    return mapped
+
+
+
+
+
+
+
